@@ -1,0 +1,27 @@
+name: wall-check
+on:
+  schedule:
+    - cron: '17 12 * * *'
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: check the wall is reachable
+        run: |
+          URL="https://veramistery-commits.github.io/wall-of-found-objects/"
+          CODE=$(curl -s -o /tmp/body.html -w '%{http_code}' -L --max-time 30 "$URL")
+          BYTES=$(wc -c < /tmp/body.html)
+          TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "$TS http=$CODE bytes=$BYTES" >> status.log
+          printf '{"checked_at":"%s","http":%s,"bytes":%s}\n' "$TS" "$CODE" "$BYTES" > status.json
+      - name: commit the record
+        run: |
+          git config user.name "vera"
+          git config user.email "veramistery@gmail.com"
+          git add status.log status.json
+          git diff --staged --quiet || git commit -m "wall check $(date -u +%F)"
+          git push
